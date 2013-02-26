@@ -1,0 +1,66 @@
+//This is in theory the driver for the parallax ultrasound range finder
+local version = 0.04;
+
+server.log(format("Boot Sonar %0.2f", version));
+server.show(format("Sonar %0.2f", version));
+imp.sleep(5);
+
+local counter = 0;
+local BAD_VAL = 1000000;
+local RVAL = -1;
+
+local out = OutputPort("distance", "number");
+imp.configure("Sonar", [], [out]);
+
+try {
+    function sonar() {  
+        
+        hardware.pin1.configure(DIGITAL_OUT);
+        hardware.pin1.write(0);
+        imp.sleep(0.000002);        // really?  seconds?
+        hardware.pin1.write(1);
+        imp.sleep(0.000005);        // really?  seconds?
+        hardware.pin1.write(0);
+        
+        local count = 0;
+
+        hardware.pin1.configure(DIGITAL_IN);
+        
+        while(hardware.pin1.read() == 0 && count < BAD_VAL) {
+            count++;
+        }
+        
+        if( count == BAD_VAL ) {
+            return RVAL;
+        }
+        
+        while(hardware.pin1.read() == 1 && count < BAD_VAL) {
+            count++;
+        }
+        
+        if( count == BAD_VAL ) {
+            return RVAL;
+        }
+        
+        return count;
+    }
+    
+    
+    function tester() {
+        local val = sonar();
+        
+        if( val == RVAL ) {
+            server.log("Bad read.");
+        } else {
+            server.log(format("Read of %d.", val));
+            out.set(val);
+        }
+        
+        imp.wakeup(0.5, tester);
+    }
+    
+    tester();
+    
+} catch (e) {
+    server.log("Exception caught: " + e);
+}
